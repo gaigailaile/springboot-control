@@ -1,0 +1,83 @@
+使用RestController之后重定向失效
+
+1.注入依赖
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-spring-boot-web-starter</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.theborakompanioni</groupId>
+            <artifactId>thymeleaf-extras-shiro</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+    </dependencies>
+
+2.配置
+    shiro.enabled=true
+    shiro.web.enabled=true
+    shiro.loginUrl=/login
+    shiro.successUrl=/index
+    shiro.unauthorizedUrl=/unauthorized
+    shiro.sessionManager.sessionIdUrlRewritingEnabled=true
+    shiro.sessionManager.sessionIdCookoeEnabled=true
+
+3.实现配置类
+    @Configuration
+    public class ShiroConfig {
+        @Bean
+        public Realm realm(){
+            TextConfigurationRealm realm = new TextConfigurationRealm();
+            realm.setUserDefinitions("sang=123,user\n admin=123,admin");
+            realm.setRoleDefinitions("admin=read,write\n user=read");
+            return realm;
+        }
+
+        @Bean
+        public ShiroFilterChainDefinition shiroFilterChainDefinition(){
+            DefaultShiroFilterChainDefinition chainDefinition =
+                    new DefaultShiroFilterChainDefinition();
+            chainDefinition.addPathDefinition("/login","anon");
+            chainDefinition.addPathDefinition("/doLogin","anon");
+            chainDefinition.addPathDefinition("/logout","logout");
+            chainDefinition.addPathDefinition("/**","authc");
+            return chainDefinition;
+        }
+
+        @Bean
+        public ShiroDialect shiroDialect(){
+            return new ShiroDialect();
+        }
+    }
+
+    @Configuration
+    public class WebConfig implements WebMvcConfigurer{
+        @Override
+        public void addViewControllers(ViewControllerRegistry registry){
+            registry.addViewController("/login").setViewName("login");
+            registry.addViewController("/index").setViewName("index");
+            registry.addViewController("/unauthorized").setViewName("unauthorized");
+        }
+    }
+
+4.实现相应接口，如登录接口
+    @PostMapping(value = "/doLogin")
+    public String doLogin(String username,String password,Model model){
+        UsernamePasswordToken token =
+                new UsernamePasswordToken(username, password);
+        Subject subject = SecurityUtils.getSubject();
+        try {
+            subject.login(token);
+        }catch (AuthenticationException e){
+            model.addAttribute("error","用户名或密码错误");
+            return "login";
+        }
+        return "redirect:/index";
+    }
